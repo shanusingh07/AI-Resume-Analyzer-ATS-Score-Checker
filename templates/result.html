@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ATS Score Analysis & AI Feedback Report</title>
+    <!-- FontAwesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <!-- Marked.js for rendering markdown -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="navbar">
+        <a href="/" class="brand">
+            <div class="brand-icon">
+                <i class="fa-solid fa-chart-column"></i>
+            </div>
+            <span>ATS Resume Pro</span>
+        </a>
+        <div class="badge-tag">
+            <i class="fa-solid fa-circle-check text-success"></i> Analysis Completed
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Top Bar Navigation -->
+        <div class="result-header-bar">
+            <a href="/" class="btn-secondary">
+                <i class="fa-solid fa-arrow-left"></i> Analyze Another Resume
+            </a>
+            <button onclick="window.print()" class="btn-secondary">
+                <i class="fa-solid fa-print"></i> Export Report
+            </button>
+        </div>
+
+        <!-- Overall Score & Breakdown Dashboard -->
+        <div class="score-dashboard">
+            
+            <!-- Overall Score Donut Card -->
+            <div class="glass-card overall-score-card">
+                <div class="gauge-wrapper">
+                    <svg class="gauge-svg" viewBox="0 0 160 160">
+                        <circle class="gauge-bg" cx="80" cy="80" r="70"></circle>
+                        <circle id="gaugeFill" class="gauge-fill" cx="80" cy="80" r="70"></circle>
+                    </svg>
+                    <div class="gauge-text">
+                        <div class="score-value" id="scoreValue">0</div>
+                        <div class="score-denom">OUT OF 100</div>
+                    </div>
+                </div>
+
+                {% if ats.ats_score >= 80 %}
+                <div class="status-badge success">
+                    <i class="fa-solid fa-circle-check"></i> Excellent ATS Match
+                </div>
+                {% elif ats.ats_score >= 60 %}
+                <div class="status-badge warning">
+                    <i class="fa-solid fa-triangle-exclamation"></i> Moderate Match - Optimization Recommended
+                </div>
+                {% else %}
+                <div class="status-badge danger">
+                    <i class="fa-solid fa-circle-xmark"></i> Low ATS Match - Urgent Fixes Needed
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Sub Metrics Cards -->
+            <div class="sub-metrics-grid">
+                
+                <!-- Keyword Match Metric -->
+                <div class="sub-metric-card">
+                    <div class="metric-header">
+                        <div class="metric-title">
+                            <i class="fa-solid fa-key text-warning"></i> Keyword Overlap Match
+                        </div>
+                        <div class="metric-score">{{ ats.keyword_score }}%</div>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" style="width: {{ ats.keyword_score }}%; background: linear-gradient(90deg, #f59e0b, #fbbf24);"></div>
+                    </div>
+                </div>
+
+                <!-- Semantic Similarity Metric -->
+                <div class="sub-metric-card">
+                    <div class="metric-header">
+                        <div class="metric-title">
+                            <i class="fa-solid fa-brain text-purple" style="color:var(--primary-purple);"></i> TF-IDF Semantic Relevance
+                        </div>
+                        <div class="metric-score">{{ ats.tfidf_score }}%</div>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" style="width: {{ ats.tfidf_score }}%; background: linear-gradient(90deg, #8b5cf6, #c4b5fd);"></div>
+                    </div>
+                </div>
+
+                <!-- Section Presence Metric -->
+                <div class="sub-metric-card">
+                    <div class="metric-header">
+                        <div class="metric-title">
+                            <i class="fa-solid fa-list-check text-cyan" style="color:var(--primary-cyan);"></i> Section Coverage Structure
+                        </div>
+                        <div class="metric-score">{{ ats.section_score }}%</div>
+                    </div>
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" style="width: {{ ats.section_score }}%; background: linear-gradient(90deg, #06b6d4, #38bdf8);"></div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Keyword Match Breakdown Card -->
+        <main class="glass-card" style="margin-bottom: 32px;">
+            <div class="keyword-controls">
+                <div class="section-title" style="margin-bottom:0;">
+                    <i class="fa-solid fa-tags text-warning"></i> Keyword Intelligence Breakdown
+                </div>
+                <div style="display:flex; gap:12px; align-items:center;">
+                    <button class="btn-secondary" id="copyMissingBtn" style="font-size:0.8rem; padding:6px 14px;">
+                        <i class="fa-regular fa-copy"></i> Copy Missing Keywords
+                    </button>
+                    <input type="text" id="kwSearch" class="kw-search" placeholder="Search keywords..." />
+                </div>
+            </div>
+
+            <div class="keyword-controls">
+                <div class="tabs">
+                    <button class="tab-btn active" onclick="filterKeywords('all', this)">
+                        All Keywords ({{ ats.missing_keywords|length + ats.matched_keywords|length }})
+                    </button>
+                    <button class="tab-btn" onclick="filterKeywords('missing', this)">
+                        <i class="fa-solid fa-circle-exclamation text-danger"></i> Missing ({{ ats.missing_keywords|length }})
+                    </button>
+                    <button class="tab-btn" onclick="filterKeywords('matched', this)">
+                        <i class="fa-solid fa-circle-check text-success"></i> Matched ({{ ats.matched_keywords|length }})
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tags Cloud -->
+            <div class="tags-cloud" id="tagsCloud">
+                {% for kw in ats.missing_keywords %}
+                <span class="kw-chip missing" data-type="missing">
+                    <i class="fa-solid fa-minus"></i> {{ kw }}
+                </span>
+                {% endfor %}
+
+                {% for kw in ats.matched_keywords %}
+                <span class="kw-chip matched" data-type="matched">
+                    <i class="fa-solid fa-check"></i> {{ kw }}
+                </span>
+                {% endfor %}
+            </div>
+        </main>
+
+        <!-- AI Recruiter Recommendations Card -->
+        <section class="glass-card">
+            <div class="keyword-controls" style="margin-bottom: 20px;">
+                <div class="section-title" style="margin-bottom:0;">
+                    <i class="fa-solid fa-robot text-purple" style="color:var(--primary-purple);"></i> GPT-4 AI Recruiter Feedback & Recommendations
+                </div>
+                <button class="btn-secondary" id="copyFeedbackBtn" style="font-size:0.8rem; padding:6px 14px;">
+                    <i class="fa-regular fa-copy"></i> Copy AI Feedback
+                </button>
+            </div>
+
+            <!-- Rendered Markdown Container -->
+            <div class="ai-feedback-container" id="aiFeedback">
+                <!-- Fallback raw markdown content passed to JS for parsing -->
+                <script type="text/template" id="rawMarkdown">
+{{ feedback }}
+                </script>
+            </div>
+        </section>
+
+        <!-- Action Footer -->
+        <div class="action-footer">
+            <a href="/" class="btn-primary" style="max-width: 320px;">
+                <i class="fa-solid fa-rotate-left"></i> Analyze Another Resume
+            </a>
+            <p class="text-dim" style="font-size:0.85rem;">
+                <i class="fa-solid fa-shield-halved"></i> Privacy Secured: Resumes are processed in memory and never stored permanently.
+            </p>
+        </div>
+    </div>
+
+    <!-- Client Script -->
+    <script>
+        // Score values & Donut Gauge SVG logic
+        const score = {{ ats.ats_score }};
+        const scoreValueEl = document.getElementById('scoreValue');
+        const gaugeFill = document.getElementById('gaugeFill');
+
+        // Animate counter
+        let currentScore = 0;
+        const duration = 1200;
+        const stepTime = 20;
+        const steps = duration / stepTime;
+        const increment = score / steps;
+
+        const counter = setInterval(() => {
+            currentScore += increment;
+            if (currentScore >= score) {
+                currentScore = score;
+                clearInterval(counter);
+            }
+            scoreValueEl.textContent = Math.round(currentScore);
+        }, stepTime);
+
+        // Set Gauge fill & color based on score
+        const radius = 70;
+        const circumference = 2 * Math.PI * radius; // ~439.8
+        const offset = circumference - (score / 100) * circumference;
+        
+        gaugeFill.style.strokeDasharray = circumference;
+        setTimeout(() => {
+            gaugeFill.style.strokeDashoffset = offset;
+        }, 100);
+
+        if (score >= 80) {
+            gaugeFill.style.stroke = 'url(#gradientSuccess)';
+            // Add SVG gradient dynamically
+            injectSvgGradient('#10b981', '#34d399');
+        } else if (score >= 60) {
+            injectSvgGradient('#f59e0b', '#fbbf24');
+        } else {
+            injectSvgGradient('#f43f5e', '#fb7185');
+        }
+
+        function injectSvgGradient(c1, c2) {
+            const svg = document.querySelector('.gauge-svg');
+            const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+            defs.innerHTML = `
+                <linearGradient id="scoreGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="${c1}" />
+                    <stop offset="100%" stop-color="${c2}" />
+                </linearGradient>
+            `;
+            svg.appendChild(defs);
+            gaugeFill.style.stroke = 'url(#scoreGrad)';
+        }
+
+        // Render AI Feedback Markdown using Marked.js
+        const rawMd = document.getElementById('rawMarkdown').textContent;
+        if (typeof marked !== 'undefined') {
+            document.getElementById('aiFeedback').innerHTML = marked.parse(rawMd);
+        } else {
+            document.getElementById('aiFeedback').innerHTML = `<pre>${rawMd}</pre>`;
+        }
+
+        // Keyword Filtering Tab Logic
+        function filterKeywords(type, btn) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            const chips = document.querySelectorAll('.kw-chip');
+            chips.forEach(chip => {
+                if (type === 'all') {
+                    chip.style.display = 'inline-flex';
+                } else if (chip.dataset.type === type) {
+                    chip.style.display = 'inline-flex';
+                } else {
+                    chip.style.display = 'none';
+                }
+            });
+        }
+
+        // Keyword Search Filter
+        document.getElementById('kwSearch').addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            document.querySelectorAll('.kw-chip').forEach(chip => {
+                const text = chip.textContent.toLowerCase();
+                if (text.includes(term)) {
+                    chip.style.display = 'inline-flex';
+                } else {
+                    chip.style.display = 'none';
+                }
+            });
+        });
+
+        // Copy Missing Keywords
+        document.getElementById('copyMissingBtn').addEventListener('click', function() {
+            const missing = [{% for kw in ats.missing_keywords %}"{{ kw }}",{% endfor %}];
+            navigator.clipboard.writeText(missing.join(', ')).then(() => {
+                this.innerHTML = '<i class="fa-solid fa-check text-success"></i> Copied!';
+                setTimeout(() => {
+                    this.innerHTML = '<i class="fa-regular fa-copy"></i> Copy Missing Keywords';
+                }, 2000);
+            });
+        });
+
+        // Copy AI Feedback
+        document.getElementById('copyFeedbackBtn').addEventListener('click', function() {
+            navigator.clipboard.writeText(rawMd).then(() => {
+                this.innerHTML = '<i class="fa-solid fa-check text-success"></i> Copied Feedback!';
+                setTimeout(() => {
+                    this.innerHTML = '<i class="fa-regular fa-copy"></i> Copy AI Feedback';
+                }, 2000);
+            });
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Resume Analyzer & ATS Score Checker</title>
+    <!-- FontAwesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+
+<body>
+    <!-- Navigation Header -->
+    <header class="navbar">
+        <a href="/" class="brand">
+            <div class="brand-icon">
+                <i class="fa-solid fa-wand-magic-sparkles"></i>
+            </div>
+            <span>ATS Resume Scorer</span>
+        </a>
+        <div class="badge-tag">
+            <i class="fa-solid fa-bolt text-warning"></i> GPT-4o & NLP Powered
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Hero Banner -->
+        <section class="hero">
+            <div class="hero-pill">
+                <i class="fa-solid fa-star"></i> Enterprise Resume Optimizer v2.0
+            </div>
+            <h1>AI Resume Analyzer & ATS Score Checker</h1>
+            <p>Upload your resume, paste the target job description, and get instant keyword matching, TF-IDF semantic
+                scoring, and actionable AI recommendations.</p>
+        </section>
+
+        <!-- Form Glass Card -->
+        <main class="glass-card">
+            <form id="analyzeForm" action="/analyze" method="POST" enctype="multipart/form-data">
+                <div class="form-grid">
+
+                    <!-- File Upload Section -->
+                    <div class="form-group">
+                        <label class="input-label">
+                            <span><i class="fa-solid fa-file-arrow-up"></i> Upload Resume</span>
+                            <span class="text-dim" style="font-size:0.775rem;">PDF or DOCX (Max 5MB)</span>
+                        </label>
+
+                        <div class="dropzone" id="dropzone">
+                            <div class="dropzone-icon">
+                                <i class="fa-solid fa-cloud-arrow-up"></i>
+                            </div>
+                            <div class="dropzone-text">Drag & drop your resume here</div>
+                            <div class="dropzone-subtext">or click to browse files on your computer</div>
+                            <input type="file" id="resumeInput" name="resume" class="file-input" accept=".pdf,.docx"
+                                required />
+                        </div>
+
+                        <!-- Selected File Preview -->
+                        <div class="file-preview" id="filePreview">
+                            <i class="fa-solid fa-file-pdf text-danger" style="font-size: 1.5rem;"
+                                id="fileTypeIcon"></i>
+                            <div class="file-info">
+                                <div class="file-name" id="fileName">resume.pdf</div>
+                                <div class="file-size" id="fileSize">245 KB</div>
+                            </div>
+                            <button type="button" class="remove-file" id="removeFileBtn" title="Remove File">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Job Description Section -->
+                    <div class="form-group">
+                        <label class="input-label">
+                            <span><i class="fa-solid fa-briefcase"></i> Job Description</span>
+                            <button type="button" class="sample-btn" id="sampleJdBtn">
+                                <i class="fa-solid fa-wand-magic-sparkles"></i> Load Sample JD
+                            </button>
+                        </label>
+
+                        <textarea id="jdInput" name="job_description" class="custom-textarea"
+                            placeholder="Paste the full job description requirements here (e.g. key responsibilities, required skills, tools, qualifications)..."
+                            required></textarea>
+
+                        <div class="textarea-footer">
+                            <span id="wordCount">0 words</span>
+                            <span>Target: 150+ words for high precision</span>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Submit Action Button -->
+                <button type="submit" class="btn-primary" id="submitBtn">
+                    <i class="fa-solid fa-bolt"></i> Analyze Resume & Generate ATS Score
+                </button>
+            </form>
+        </main>
+
+        <!-- Feature Highlights -->
+        <section class="features-grid">
+            <div class="feature-box">
+                <i class="fa-solid fa-bullseye feature-icon"></i>
+                <h4>50+ Keyword Check</h4>
+                <p>Identifies essential technical & soft skills missing from your resume using spaCy NLP.</p>
+            </div>
+            <div class="feature-box">
+                <i class="fa-solid fa-chart-pie feature-icon"></i>
+                <h4>TF-IDF Vector Matching</h4>
+                <p>Measures exact semantic relevance against employer ATS scoring algorithms.</p>
+            </div>
+            <div class="feature-box">
+                <i class="fa-solid fa-robot feature-icon"></i>
+                <h4>GPT-4 Actionable AI</h4>
+                <p>Provides bullet-by-bullet rewrites, layout fixes, and quick wins to pass recruiter screens.</p>
+            </div>
+        </section>
+    </div>
+
+    <!-- Loading Modal Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <h3 style="font-family:'Plus Jakarta Sans'; color:#fff; margin-bottom: 8px;">Analyzing Your Resume...</h3>
+            <p style="color:var(--text-muted); font-size:0.875rem;">Our AI Engine is scanning and evaluating your
+                application.</p>
+
+            <ul class="loading-steps">
+                <li class="loading-step current" id="step1">
+                    <i class="fa-solid fa-spinner fa-spin"></i> Parsing document structure & text
+                </li>
+                <li class="loading-step" id="step2">
+                    <i class="fa-regular fa-circle"></i> Extracting keywords with spaCy NLP
+                </li>
+                <li class="loading-step" id="step3">
+                    <i class="fa-regular fa-circle"></i> Computing TF-IDF cosine similarity
+                </li>
+                <li class="loading-step" id="step4">
+                    <i class="fa-regular fa-circle"></i> Generating AI recruiter feedback
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Client JavaScript -->
+    <script>
+        const dropzone = document.getElementById('dropzone');
+        const resumeInput = document.getElementById('resumeInput');
+        const filePreview = document.getElementById('filePreview');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const fileTypeIcon = document.getElementById('fileTypeIcon');
+        const removeFileBtn = document.getElementById('removeFileBtn');
+
+        const jdInput = document.getElementById('jdInput');
+        const wordCount = document.getElementById('wordCount');
+        const sampleJdBtn = document.getElementById('sampleJdBtn');
+        const analyzeForm = document.getElementById('analyzeForm');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+
+        // Dropzone interactions
+        dropzone.addEventListener('click', () => resumeInput.click());
+
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.classList.add('dragover');
+        });
+
+        dropzone.addEventListener('dragleave', () => {
+            dropzone.classList.remove('dragover');
+        });
+
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) {
+                resumeInput.files = e.dataTransfer.files;
+                handleFileSelect();
+            }
+        });
+
+        resumeInput.addEventListener('change', handleFileSelect);
+
+        function handleFileSelect() {
+            if (resumeInput.files.length > 0) {
+                const file = resumeInput.files[0];
+                fileName.textContent = file.name;
+                fileSize.textContent = (file.size / 1024).toFixed(1) + ' KB';
+
+                if (file.name.endsWith('.docx')) {
+                    fileTypeIcon.className = 'fa-solid fa-file-word text-warning';
+                } else {
+                    fileTypeIcon.className = 'fa-solid fa-file-pdf text-danger';
+                }
+
+                filePreview.classList.add('active');
+            }
+        }
+
+        removeFileBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            resumeInput.value = '';
+            filePreview.classList.remove('active');
+        });
+
+        // Word Counter
+        jdInput.addEventListener('input', () => {
+            const text = jdInput.value.trim();
+            const words = text ? text.split(/\s+/).length : 0;
+            wordCount.textContent = words + ' words';
+        });
+
+        // Sample JD Quick Fill
+        sampleJdBtn.addEventListener('click', () => {
+            jdInput.value = `Senior Full Stack Developer / Software Engineer
+
+Responsibilities:
+- Design, build, and maintain scalable web applications using Python, Flask, React, and PostgreSQL.
+- Implement RESTful APIs, microservices architecture, and automated testing pipelines.
+- Optimize database queries, page loading performance, and cloud deployment pipelines (Docker, AWS, CI/CD).
+- Collaborate with cross-functional teams, product managers, and UI/UX designers using Agile methodologies.
+- Write clean, maintainable, and well-documented code adhering to best practices and Git workflows.
+
+Requirements:
+- 3+ years of professional experience in software engineering or backend development.
+- Strong proficiency in Python, JavaScript/TypeScript, HTML5, CSS3, SQL, and Git version control.
+- Experience with web frameworks like Flask, Django, or FastAPI.
+- Familiarity with cloud platforms (AWS/GCP), Docker containers, and CI/CD tools.
+- Excellent problem-solving skills, algorithmic thinking, and communication abilities.`;
+            jdInput.dispatchEvent(new Event('input'));
+        });
+
+        // Form Submit Loading Animation
+        analyzeForm.addEventListener('submit', () => {
+            loadingOverlay.classList.add('active');
+
+            // Progress steps simulation
+            setTimeout(() => {
+                document.getElementById('step1').className = 'loading-step done';
+                document.getElementById('step1').querySelector('i').className = 'fa-solid fa-circle-check text-success';
+                document.getElementById('step2').className = 'loading-step current';
+                document.getElementById('step2').querySelector('i').className = 'fa-solid fa-spinner fa-spin';
+            }, 1200);
+
+            setTimeout(() => {
+                document.getElementById('step2').className = 'loading-step done';
+                document.getElementById('step2').querySelector('i').className = 'fa-solid fa-circle-check text-success';
+                document.getElementById('step3').className = 'loading-step current';
+                document.getElementById('step3').querySelector('i').className = 'fa-solid fa-spinner fa-spin';
+            }, 2500);
+
+            setTimeout(() => {
+                document.getElementById('step3').className = 'loading-step done';
+                document.getElementById('step3').querySelector('i').className = 'fa-solid fa-circle-check text-success';
+                document.getElementById('step4').className = 'loading-step current';
+                document.getElementById('step4').querySelector('i').className = 'fa-solid fa-spinner fa-spin';
+            }, 4000);
+        });
+    </script>
+</body>
+
+</html>
